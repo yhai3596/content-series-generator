@@ -151,12 +151,30 @@ Master Task: "Generate content series: {series_name}"
 ### Phase 1: Outline Generation
 
 1. **Parse user request** - Extract topic, count, word count, style
-2. **Research phase** (with fallback):
-   - Attempt WebSearch for latest trends and news
-   - If WebSearch fails: Use knowledge-based generation
-   - Extract keywords and audience insights
-3. **Generate outline** - Create structured article plan
-4. **User review** - Present outline for approval/modification
+2. **Initialize master task** - Create TaskCreate for entire series
+3. **Research phase** (CRITICAL - MUST execute):
+   - **Call WebSearch tool** with query: `{topic} 最新趋势 2026` (or `{topic} latest trends 2026` for English)
+   - **Set timeout expectation**: 10 seconds max
+   - **Handle response**:
+     - If successful: Extract keywords, trends, recent news from results
+     - If failed/empty:
+       - Log error to `{series-id}/errors.log`
+       - Set `news_source = "websearch"` in metadata.json
+       - Continue with knowledge-based generation
+       - Add disclaimer about information currency in outline
+   - **Extract insights**: Regardless of success, analyze the topic and extract:
+     - Target audience pain points
+     - Industry keywords
+     - Trending sub-topics
+     - Common questions
+4. **Generate outline** - Use Claude's knowledge + WebSearch results (if available) to create structured plan
+5. **User review** - Present outline for approval/modification
+
+**RESEARCH PHASE MUST-KNOW**:
+- ⚠️ WebSearch is NOT a Node.js function - it's a Claude tool you CALL during workflow
+- ⚠️ You must ACTIVELY invoke WebSearch tool with specific query
+- ⚠️ Don't assume it happens automatically - you need to DO IT
+- ⚠️ Document the attempt in metadata.json whether it succeeds or fails
 
 ### Phase 2: Content Generation
 
@@ -453,9 +471,22 @@ Enhanced utility functions.
 **MUST verify before marking series complete**:
 
 ### Phase 1: Outline Generation
+**CRITICAL**: WebSearch must be attempted
 - [ ] All 5 parameters collected (series_name, target_audience, writing_style, article_count, words_per_article)
+- [ ] **WebSearch tool was CALLED** (not just mentioned - you must invoke the tool)
+- [ ] WebSearch results documented in outline (or fallback noted)
+- [ ] `news_source` set in metadata.json (`"websearch"` or `"fallback"`)
+- [ ] Keywords and audience insights extracted
 - [ ] Outline generated and saved to outline.json
 - [ ] User approved outline (or skipped with explicit consent)
+
+**WebSearch Call Verification**:
+```
+✅ Evidence of WebSearch call:
+   - Query used: "{topic} 最新趋势 2026"
+   - Results obtained: Yes/No
+   - If failed: Error logged and fallback executed
+```
 
 ### Phase 2: Content Generation
 - [ ] Master task created using TaskCreate
@@ -487,6 +518,52 @@ Enhanced utility functions.
 **Symptom**: "WebSearch failed" in logs
 **Solution**: Automatic fallback to knowledge-based generation
 **Impact**: Content still high-quality, may lack latest news
+
+### WebSearch Never Called (CRITICAL ERROR)
+**Symptom**: `news_source` always shows "fallback", never "websearch" in metadata.json
+**Root Cause**: WebSearch tool not actually being INVOKED during Phase 1 research
+**Diagnosis Steps**:
+1. Check metadata.json: `"news_source": "..."` field - is it still "pending"?
+2. Check if `{series-id}/errors.log` exists with WebSearch call attempts
+3. Review Phase 1 execution: Did you see WebSearch tool invocation in the conversation?
+
+**Root Cause Analysis**:
+- ❌ Mistaking "mention WebSearch" for "calling WebSearch tool"
+- ❌ Assuming WebSearch happens automatically (it doesn't - you must explicitly invoke)
+- ❌ No verification step after Phase 1 to confirm news_source was set
+
+**Solution**:
+1. **In Phase 1, Step 3**: MUST explicitly invoke WebSearch tool with specific parameters:
+   ```
+   Action: Call WebSearch tool
+   Query: "{topic} 最新趋势 2026" (or "{topic} latest trends 2026" for English)
+   Timeout: 10 seconds max
+   ```
+2. **Document immediately**: After calling WebSearch, update metadata.json:
+   ```json
+   {
+     "news_source": "websearch",  // or "fallback" if failed
+     "websearch_query": "{actual query used}",
+     "websearch_timestamp": "2026-02-22T09:00:00Z",
+     "websearch_results_count": {number of results}
+   }
+   ```
+3. **Verify before proceeding**: Before moving to Phase 1 Step 4, confirm:
+   - ✅ WebSearch tool was invoked (check tool call in conversation history)
+   - ✅ Results were captured (even if empty/failed)
+   - ✅ metadata.json has news_source set (not "pending")
+
+**Prevention Checklist**:
+- [ ] Add "Call WebSearch tool" to your Phase 1 execution checklist
+- [ ] After calling WebSearch, immediately check metadata.json to verify news_source updated
+- [ ] If news_source is still "pending", STOP and call WebSearch before continuing
+- [ ] Document WebSearch attempt (success or failure) in `{series-id}/research.log`
+
+**Impact of Not Calling WebSearch**:
+- Content lacks latest trends and news
+- Reduced relevance and value for readers
+- `metadata.json` has inaccurate "news_source" information
+- Cannot differentiate between "websearch failed" vs "websearch not attempted"
 
 ### B4A Publishing Failed
 **Symptom**: "Publish failed" for specific articles
@@ -559,18 +636,37 @@ Task N: Batch publish to B4A
 
 ## Version History
 
-### V2.1 (Current) - 2026-02-22
+### V2.2 (Current) - 2026-02-22
 **CRITICAL FIXES**:
 - ✅ Made quality review **MANDATORY** (was optional, caused skips)
 - ✅ Added standardized task list creation at workflow start
 - ✅ Added Task Management Strategy section with strict rules
 - ✅ Enhanced Best Practices with task management guidelines
+- ✅ **Fixed WebSearch never being called** - Added explicit invocation instructions
+- ✅ Added WebSearch verification checklist in Validation section
+- ✅ Added "WebSearch Never Called" troubleshooting guide
 - ⚠️ Fixed: Quality review was being skipped due to "(optional)" label
+- ⚠️ Fixed: WebSearch tool was not being invoked (only mentioned, not called)
 
 **Previous Issues**:
 - Quality review step marked as "(optional)" led to skipping
 - No standardized task list creation
 - Task tracking was inconsistent
+- WebSearch tool never actually invoked during Phase 1 research
+
+### V2.1 - Task Management Fix
+- Made quality review mandatory
+- Added task management strategy
+- Enhanced validation checklists
+
+### V2.0 - Initial V2 Release
+- Intelligent outline with news research
+- Graceful fallback for WebSearch failures
+- Descriptive file naming: `{title}_{timestamp}.md`
+- Enhanced error handling and retry logic
+- Task-based progress tracking (but not enforced)
+
+**Note**: V2.0 had design flaw - WebSearch was described but not explicitly invoked
 
 ### V2.0 - Initial V2 Release
 - Intelligent outline with news research
