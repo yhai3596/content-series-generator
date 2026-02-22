@@ -1,0 +1,56 @@
+{
+  "firecrawl": {
+    "enabled": true,
+    "api_key": "fc-83991705bbd145da8eeaddc5ba74586d",
+    "timeout": 10000,
+    "max_pages": 3,
+    "urls_to_crawl": [
+      "https://www.anthropic.com/news",
+      "https://github.com/anthropics/claude-code",
+      "https://medium.com/tag/claude-ai"
+    ]
+  },
+  "tavily": {
+    "enabled": true,
+    "api_key": "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",
+    "timeout": 8000,
+    "search_depth": "advanced",
+    "max_results": 10
+  },
+  "serpapi": {
+    "enabled": true,
+    "api_key": "b529ac2fdbb18ff24c729c8e088acc74055915d55ed2149231e0c016dc7625ef",
+    "timeout": 10000,
+    "engine": "google",
+    "location": "China"
+  },
+  "rss_feeds": {
+    "enabled": true,
+    "feeds": [
+      "https://www.anthropic.com/news/rss",
+      "https://github.com/topics/claude-ai.atom",
+      "https://medium.com/feed/tag/artificial-intelligence",
+      "https://techcrunch.com/category/artificial-intelligence/feed/"
+    ],
+    "timeout": 5000
+  },
+  "github": {
+    "enabled": true,
+    "token": "ghp_placeholder_token_replace_with_real_token_if_needed",
+    "search_repos": true,
+    "search_issues": true,
+    "timeout": 8000
+  },
+  "fallback_order": [
+    "firecrawl",
+    "tavily",
+    "rss_feeds",
+    "github",
+    "serpapi"
+  ],
+  "logging": {
+    "enabled": true,
+    "log_file": "research.log",
+    "log_level": "info"
+  }
+}
