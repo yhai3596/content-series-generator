@@ -1,0 +1,168 @@
+{
+  "_comment": "微信文章抓取配置 - 预留多种抓取方式的接口",
+  "_description": "支持未来wechat-content-extractor skill集成，提供统一的配置接口",
+
+  "version": "1.0.0",
+  "enabled": false,
+
+  "crawler_strategy": {
+    "_comment": "抓取策略选择: cookie | playwright | proxy | manual",
+    "strategy": "cookie",
+    "fallback_strategies": ["manual", "playwright"]
+  },
+
+  "cookie_method": {
+    "_comment": "方案3: Cookie手动提取方案配置",
+    "enabled": true,
+    "api_endpoint": "https://mp.weixin.qq.com/mp/profile_ext",
+    "credentials": {
+      "cookie": "your_cookie_here",
+      "token": "your_token_here",
+      "biz": "your_biz_id_here"
+    },
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    },
+    "request_interval": 2000,
+    "_note": "Cookie有效期通常为2-4小时，需要定期更新"
+  },
+
+  "playwright_method": {
+    "_comment": "方案2: Playwright浏览器自动化方案配置",
+    "enabled": false,
+    "browser_options": {
+      "headless": false,
+      "args": [
+        "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+        "--disable-gpu",
+        "--disable-dev-shm-usage"
+      ]
+    },
+    "stealth_config": {
+      "enabled": true,
+      "webdriver_undetected": true,
+      "languages": ["zh-CN", "zh", "en-US", "en"],
+      "vendor": "Google Inc.",
+      "platform": "Win32"
+    },
+    "wait_time": {
+      "page_load": 3000,
+      "after_scroll": 1000,
+      "content_extract": 500
+    },
+    "proxy": {
+      "enabled": false,
+      "host": "",
+      "port": 0,
+      "username": "",
+      "password": ""
+    }
+  },
+
+  "proxy_method": {
+    "_comment": "方案1: AnyProxy代理拦截方案配置",
+    "enabled": false,
+    "proxy_type": "anyproxy",
+    "listen_port": 8001,
+    "web_interface_port": 8002,
+    "ssl_ca": {
+      "generate_cert": true,
+      "cert_path": "./certs"
+    },
+    "mobile_setup": {
+      "enabled": true,
+      "install_cert_to_mobile": true,
+      "mobile_proxy_ip": "192.168.1.100"
+    },
+    "storage": {
+      "type": "mongodb",
+      "connection_string": "mongodb://localhost:27017/wechat_articles",
+      "database": "wechat_articles"
+    }
+  },
+
+  "manual_method": {
+    "_comment": "方案4: 手动复制方案配置",
+    "enabled": true,
+    "input_methods": {
+      "clipboard": true,
+      "file_import": true,
+      "text_input": true
+    },
+    "supported_formats": ["text", "html", "markdown"]
+  },
+
+  "content_extraction": {
+    "_comment": "内容提取规则 - 从原始内容中提取结构化数据",
+    "selectors": {
+      "title": ["h1", "#activity-name", "meta[property='og:title']"],
+      "author": [".profile_nickname", "#js_name", "meta[property='og:author']"],
+      "publish_time": [".profile_meta_value", "#publish_time"],
+      "content": ["#js_content", ".rich_media_content"],
+      "images": ["#js_content img", ".rich_media_content img"]
+    },
+    "cleanup_rules": {
+      "remove_scripts": true,
+      "remove_ads": true,
+      "preserve_formatting": true
+    }
+  },
+
+  "data_output": {
+    "_comment": "标准化输出格式",
+    "format": "standardized",
+    "fields": [
+      "title",
+      "author",
+      "publish_date",
+      "original_url",
+      "content_html",
+      "content_text",
+      "images",
+      "metadata"
+    ],
+    "save_to": {
+      "enabled": true,
+      "type": "json_file",
+      "directory": "./data/wechat_articles/"
+    }
+  },
+
+  "rate_limit": {
+    "_comment": "请求频率限制，防止被封禁",
+    "requests_per_minute": 10,
+    "requests_per_hour": 100,
+    "delay_between_requests": 2000,
+    "retry_on_failure": {
+      "enabled": true,
+      "max_retries": 3,
+      "backoff_multiplier": 2
+    }
+  },
+
+  "error_handling": {
+    "log_errors": true,
+    "error_log_file": "./logs/wechat_crawler_errors.log",
+    "on_verification_required": {
+      "action": "pause_and_notify",
+      "message": "需要人工验证，请在浏览器中完成验证后继续"
+    },
+    "on_rate_limit": {
+      "action": "wait_and_retry",
+      "wait_time": 3600
+    }
+  },
+
+  "integration": {
+    "_comment": "与content-series-generator-v2的集成配置",
+    "auto_rewrite_enabled": true,
+    "rewrite_style": "soul-scribe-c",
+    "publish_after_rewrite": true,
+    "publish_platform": "b4a",
+    "output_format_for_generation": {
+      "type": "markdown",
+      "include_metadata": true
+    }
+  }
+}

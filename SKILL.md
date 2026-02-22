@@ -466,6 +466,239 @@ Enhanced utility functions.
 - User visibility into generation status
 - Resume capability
 
+## WeChat Content Integration
+
+**Reserved interface for future wechat-content-extractor skill integration**
+
+The content-series-generator-v2 has reserved a standardized interface for extracting and rewriting WeChat articles. Future wechat-content-extractor skill can plug into this seamlessly.
+
+### How It Works
+
+**Three integration points have been prepared:**
+
+### 1. Configuration File (`config/wechat-crawler.json`)
+
+A comprehensive configuration template is ready:
+
+```javascript
+{
+  "crawler_strategy": {
+    "strategy": "cookie",  // cookie | playwright | proxy | manual
+    "fallback_strategies": ["manual", "playwright"]
+  },
+  "data_output": {
+    "format": "standardized",
+    "fields": ["title", "author", "publish_date", "content_html", "content_text"]
+  }
+}
+```
+
+**Supported Strategies**:
+- **cookie**: Extract articles using WeChat API with manually obtained cookie
+- **playwright**: Browser automation to bypass anti-crawling (simulates real user)
+- **proxy**: Intercept WeChat requests via AnyProxy (batch extraction)
+- **manual**: Manual copy-paste with interactive prompts
+
+### 2. Extractor Interface (`scripts/wechat-extractor.js`)
+
+Pre-built class with standardized interface:
+
+```javascript
+const { WeChatArticleExtractor } = require('./scripts/wechat-extractor');
+
+const extractor = new WeChatArticleExtractor({ strategy: 'cookie' });
+
+// Extract single article
+const article = await extractor.extractArticle('https://mp.weixin.qq.com/s/xxx');
+
+// Returns standardized format:
+{
+  title: "Article Title",
+  author: "Author Name",
+  publish_date: "2026-01-15",
+  content_html: "<div>...</div>",
+  content_text: "Clean text content...",
+  metadata: {
+    extracted_at: "2026-02-22T10:30:00Z",
+    strategy: "cookie",
+    word_count: 1542
+  }
+}
+```
+
+**Integration Flow**:
+1. Future wechat-content-extractor skill implements actual extraction logic
+2. Skill exports standardized `article` object
+3. Content generator receives article and applies rewriting
+4. Process through quality review
+5. Publish to B4A
+
+### 3. Integration Pattern (Future Implementation)
+
+**Example workflow for extracting and rewriting WeChat articles:**
+
+```javascript
+// Step 1: Extract article (wechat-content-extractor skill)
+const rawArticle = await wechatExtractor.extractArticle(wechatUrl);
+
+// Step 2: Transform to series format
+const seriesParams = {
+  series_name: `${rawArticle.author}精选`,
+  target_audience: "科技爱好者",
+  writing_style: "narrative-deep",
+  article_count: 5,  // Series continuation based on article
+  words_per_article: 3000
+};
+
+// Step 3: Generate outline with expanded insights
+const outline = await generateOutline(`${rawArticle.title}深度解析系列`, seriesParams);
+
+// Step 4: Generate and publish series
+await generateContentSeries(outline, seriesParams, rawArticle);
+```
+
+### Manual Integration (Current Workaround)
+
+Before wechat-content-extractor skill is ready:
+
+```bash
+# Use manual mode to extract article
+node scripts/wechat-extractor.js --manual --save
+
+# Then use extracted content for series generation
+node scripts/generate-outline-v2.js "${WECHAT_ARTICLE_TOPIC}" --articles=5
+```
+
+**Full workflow**:
+```bash
+# 1. Extract WeChat article (manual mode, creates temp file)
+cd ~/.claude/skills/content-series-generator-v2
+node scripts/wechat-extractor.js --manual
+
+# 2. Copy extracted content
+# File saved to: ./data/wechat_articles/{title}_{timestamp}.json
+
+# 3. Generate series based on extracted topic
+node scripts/generate-outline-v2.js "${topic}" --articles=5 --words=3000
+
+# 4. Edit outline.json to incorporate WeChat article insights
+
+# 5. Generate and publish series as usual
+```
+
+### Configuration Reference
+
+**File**: `config/wechat-crawler.json`
+
+**Key Settings**:
+```json
+{
+  "cookie_method": {
+    "enabled": true,
+    "credentials": {
+      "cookie": "obtained_from_browser",
+      "token": "wechat_api_token",
+      "biz": "official_account_id"
+    }
+  },
+  "playwright_method": {
+    "enabled": false,
+    "browser_options": {
+      "headless": false,
+      "args": ["--disable-blink-features=AutomationControlled"]
+    }
+  },
+  "proxy_method": {
+    "enabled": false,
+    "listen_port": 8001
+  },
+  "rate_limit": {
+    "requests_per_minute": 10,
+    "delay_between_requests": 2000
+  }
+}
+```
+
+### Next Steps for wechat-content-extractor Skill
+
+To implement full integration:
+
+1. **Create wechat-content-extractor skill directory**:
+   ```
+   ~/.claude/skills/wechat-content-extractor/
+   ├── SKILL.md
+   ├── scripts/
+   │   └── wechat-crawler.js  (actual implementation)
+   └── config/
+       └── wechat-api-keys.json
+   ```
+
+2. **Implement Strategy Classes**:
+   - `CookieStrategy` - Handle WeChat API with cookie
+   - `PlaywrightStrategy` - Browser automation with anti-detection
+   - `ProxyStrategy` - AnyProxy interception for batch extraction
+   - `ManualStrategy` - Interactive prompts
+
+3. **Update wechat-extractor.js**:
+   - Replace "TODO" sections with actual implementation
+   - Keep standardized output format
+   - Maintain fallback chain
+
+4. **Add integration hooks to content-series-generator-v2**:
+   ```javascript
+   // In generate-content-v2.js
+   const { WeChatArticleExtractor } = require('../wechat-content-extractor');
+
+   if (sourceArticle && sourceArticle.from_wechat) {
+     const additionalInsights = await extractWeChatContent(sourceArticle.url);
+     content = incorporateInsights(content, additionalInsights);
+   }
+   ```
+
+5. **Test and validate**:
+   - Extract 5-10 articles using each strategy
+   - Verify content quality and completeness
+   - Test integration with series generation
+   - Validate B4A publishing
+
+### Known Limitations
+
+**Current Status** (2026-02-22):
+- ✅ Configuration file ready
+- ✅ Interface specification defined
+- ✅ Basic framework implemented
+- ❌ Actual extraction logic is "TODO"/stub
+- ❌ No Cookie/Playwright/Proxy implementation
+- ❌ Manual mode works (copy-paste)
+
+**To fully enable**:
+1. Develop wechat-content-extractor skill (external project)
+2. Implement strategy classes (2-3 weeks development)
+3. Add cookie rotation and error handling
+4. Test anti-crawling bypass techniques
+5. Create user documentation
+
+### Troubleshooting WeChat Integration
+
+**Problem**: Cannot extract WeChat articles
+**Diagnosis**:
+1. Check if wechat-content-extractor skill exists: `ls ~/.claude/skills/`
+2. Verify config/wechat-crawler.json exists and is valid JSON
+3. Check if selected strategy is enabled in config
+4. For cookie method: Verify cookie and token are current (expire after 2-4 hours)
+
+**Quick Fix** (Before skill is ready):
+1. Use `--manual` mode: `node scripts/wechat-extractor.js --manual --save`
+2. Or use wechat-content-creator skill to generate original content
+3. Or use slash-b4a to rewrite with different URL sources
+
+**Future Enhancement**:
+- Add WeChat verification code handling
+- Implement cookie auto-refresh
+- Add queue system for batch extraction
+- Integrate with content quality reviewer
+- Support multi-account rotation
+
 ## Configuration
 
 ### Hybrid Research MCP Setup
