@@ -466,26 +466,188 @@ Enhanced utility functions.
 - User visibility into generation status
 - Resume capability
 
+## Configuration
+
+### Hybrid Research MCP Setup
+
+To enable real-time news and trend research, configure the Hybrid Research MCP with your API keys.
+
+**Step 1: Create Configuration File**
+
+Create `~/.claude/skills/content-series-generator-v2/config/research-providers.json`:
+
+```json
+{
+  "firecrawl": {
+    "enabled": true,
+    "api_key": "YOUR_FIRECRAWL_API_KEY_HERE",
+    "timeout": 10000,
+    "max_pages": 3
+  },
+  "brave_search": {
+    "enabled": false,
+    "api_key": "YOUR_BRAVE_API_KEY_HERE",
+    "timeout": 8000
+  },
+  "serpapi": {
+    "enabled": false,
+    "api_key": "YOUR_SERPAPI_KEY_HERE",
+    "timeout": 10000
+  },
+  "rss_feeds": {
+    "enabled": true,
+    "feeds": [
+      "https://www.anthropic.com/news/rss",
+      "https://github.com/topics/claude-ai.atom",
+      "https://medium.com/feed/tag/artificial-intelligence"
+    ]
+  },
+  "github": {
+    "enabled": true,
+    "token": "YOUR_GITHUB_TOKEN_HERE",
+    "search_repos": true,
+    "search_issues": true
+  },
+  "fallback_order": [
+    "firecrawl",
+    "rss_feeds",
+    "github",
+    "brave_search",
+    "serpapi"
+  ]
+}
+```
+
+**Step 2: Update API Keys**
+
+Replace `YOUR_*_API_KEY_HERE` with your actual API keys:
+
+- **Firecrawl API Key**: Get from https://firecrawl.dev
+  - Recommended: Most reliable for JavaScript-rendered pages
+  - Enable JavaScript rendering for dynamic content
+
+- **GitHub Token**: Get from https://github.com/settings/tokens
+  - Only needs `public_repo` scope for search
+  - No additional cost for search API (within limits)
+
+- **Brave Search API** (Optional): Get from https://brave.com/search/api
+  - Alternative if Firecrawl fails
+  - Provides clean search results
+
+- **SerpAPI** (Optional): Get from https://serpapi.com
+  - Google search results
+  - May incur costs
+
+**Step 3: Test Configuration**
+
+```bash
+cd ~/.claude/skills/content-series-generator-v2
+node scripts/test-research-mcp.js "Claude Skills latest trends"
+```
+
+Expected output:
+```
+✅ Testing research providers...
+[1/5] Firecrawl: ✅ Success (3 results)
+[2/5] RSS Feeds: ✅ Success (8 articles)
+[3/5] GitHub: ✅ Success (12 repositories)
+✅ Final source: hybrid-firecrawl
+✅ Research completed with 23 total results
+```
+
+### How Hybrid Research Works
+
+The hybrid research system follows this priority order:
+
+1. **Firecrawl** (Highest priority)
+   - Crawls: Anthropic official site, tech blogs, documentation
+   - Extracts: Latest announcements, feature updates, case studies
+   - Best for: Official and authoritative content
+
+2. **RSS Feeds**
+   - Aggregates: Anthropic blog, GitHub topics, Medium articles
+   - Extracts: Recent articles, trending topics, community discussions
+   - Best for: News and community content
+
+3. **GitHub API**
+   - Searches: Repositories with topic keywords, recent issues
+   - Extracts: Popular projects, common problems, implementation examples
+   - Best for: Technical implementations and real-world usage
+
+4. **Brave Search / SerpAPI** (Optional)
+   - Searches: Web for recent news and articles
+   - Best for: Broad coverage when other sources fail
+
+5. **Knowledge Fallback** (Always available)
+   - Uses: Claude's training data and reasoning
+   - Best for: Foundational concepts and timeless principles
+
+### Environment Variables (Alternative Method)
+
+Instead of config file, you can use environment variables:
+
+```bash
+# Add to ~/.claude/.env
+export FIRECRAWL_API_KEY=your_key_here
+export GITHUB_TOKEN=your_token_here
+export BRAVE_API_KEY=your_key_here  # Optional
+export SERPAPI_KEY=your_key_here     # Optional
+```
+
+### Troubleshooting Configuration
+
+### Configuration File Not Found
+**Symptom**: `Error: config/research-providers.json not found`
+**Solution**: Create the config file following Step 1 above
+
+### API Key Invalid
+**Symptom**: `401 Unauthorized` errors
+**Solution**:
+1. Verify API key is correct
+2. Check if API key has sufficient quota
+3. Try regenerating the API key
+4. Check provider dashboard for error logs
+
+### All Research Providers Fail
+**Symptom**: `finalSource: "fallback"` every time
+**Diagnosis**:
+1. Check internet connectivity
+2. Verify all API keys are valid
+3. Review `~/.claude/logs/research-mcp.log` for detailed errors
+4. Test individual providers with: `node scripts/test-research-mcp.js --provider=firecrawl`
+
+### Research Too Slow
+**Symptom**: Research phase takes >30 seconds
+**Solution**:
+1. Reduce `timeout` values in config (e.g., 5000ms)
+2. Set `enabled: false` for slower providers
+3. Reduce `max_pages` for Firecrawl
+4. Use `fallback_order` to prioritize faster providers
+
 ## Validation Checklist
 
 **MUST verify before marking series complete**:
 
 ### Phase 1: Outline Generation
-**CRITICAL**: WebSearch must be attempted
+**CRITICAL**: Hybrid research MUST be executed
 - [ ] All 5 parameters collected (series_name, target_audience, writing_style, article_count, words_per_article)
-- [ ] **WebSearch tool was CALLED** (not just mentioned - you must invoke the tool)
-- [ ] WebSearch results documented in outline (or fallback noted)
-- [ ] `news_source` set in metadata.json (`"websearch"` or `"fallback"`)
-- [ ] Keywords and audience insights extracted
+- [ ] **Hybrid research MCP was called** (not just mentioned)
+- [ ] Configuration file exists: `config/research-providers.json`
+- [ ] At least one API key is configured (Firecrawl recommended)
+- [ ] Research results documented in outline (or fallback noted)
+- [ ] `news_source` set in metadata.json (`"hybrid-firecrawl"`, `"hybrid-rss"`, `"hybrid-github"`, or `"fallback"`)
+- [ ] Keywords and audience insights extracted from research results
 - [ ] Outline generated and saved to outline.json
 - [ ] User approved outline (or skipped with explicit consent)
 
-**WebSearch Call Verification**:
+**Research Verification**:
 ```
-✅ Evidence of WebSearch call:
-   - Query used: "{topic} 最新趋势 2026"
-   - Results obtained: Yes/No
-   - If failed: Error logged and fallback executed
+✅ Evidence of research execution:
+   - Hybrid MCP invoked: Yes
+   - Final source: hybrid-firecrawl | hybrid-rss | hybrid-github | fallback
+   - Research timestamp: {timestamp}
+   - Total results obtained: {count}
+   - Log file: {series-id}/research.log
 ```
 
 ### Phase 2: Content Generation
@@ -514,56 +676,55 @@ Enhanced utility functions.
 2. Re-publish if scores are below threshold
 3. Update skill.md to make quality review MANDATORY (already fixed in V2.1)
 
-### WebSearch Unavailable
-**Symptom**: "WebSearch failed" in logs
-**Solution**: Automatic fallback to knowledge-based generation
-**Impact**: Content still high-quality, may lack latest news
-
-### WebSearch Never Called (CRITICAL ERROR)
-**Symptom**: `news_source` always shows "fallback", never "websearch" in metadata.json
-**Root Cause**: WebSearch tool not actually being INVOKED during Phase 1 research
-**Diagnosis Steps**:
-1. Check metadata.json: `"news_source": "..."` field - is it still "pending"?
-2. Check if `{series-id}/errors.log` exists with WebSearch call attempts
-3. Review Phase 1 execution: Did you see WebSearch tool invocation in the conversation?
-
-**Root Cause Analysis**:
-- ❌ Mistaking "mention WebSearch" for "calling WebSearch tool"
-- ❌ Assuming WebSearch happens automatically (it doesn't - you must explicitly invoke)
-- ❌ No verification step after Phase 1 to confirm news_source was set
+### Hybrid Research MCP Errors
+**Symptom**: `Error: Cannot find research-mcp module` or `Error: No research providers available`
+**Diagnosis**:
+1. Check if `config/research-providers.json` exists
+2. Verify at least one API key is configured
+3. Check log file: `~/.claude/logs/research-mcp.log`
 
 **Solution**:
-1. **In Phase 1, Step 3**: MUST explicitly invoke WebSearch tool with specific parameters:
-   ```
-   Action: Call WebSearch tool
-   Query: "{topic} 最新趋势 2026" (or "{topic} latest trends 2026" for English)
-   Timeout: 10 seconds max
-   ```
-2. **Document immediately**: After calling WebSearch, update metadata.json:
-   ```json
-   {
-     "news_source": "websearch",  // or "fallback" if failed
-     "websearch_query": "{actual query used}",
-     "websearch_timestamp": "2026-02-22T09:00:00Z",
-     "websearch_results_count": {number of results}
-   }
-   ```
-3. **Verify before proceeding**: Before moving to Phase 1 Step 4, confirm:
-   - ✅ WebSearch tool was invoked (check tool call in conversation history)
-   - ✅ Results were captured (even if empty/failed)
-   - ✅ metadata.json has news_source set (not "pending")
+1. Run test script to verify setup: `node scripts/test-research-mcp.js`
+2. Follow Configuration section to set up API keys
+3. Ensure all required npm packages are installed: `npm install` in skill directory
 
-**Prevention Checklist**:
-- [ ] Add "Call WebSearch tool" to your Phase 1 execution checklist
-- [ ] After calling WebSearch, immediately check metadata.json to verify news_source updated
-- [ ] If news_source is still "pending", STOP and call WebSearch before continuing
-- [ ] Document WebSearch attempt (success or failure) in `{series-id}/research.log`
+### All Research Providers Fail
+**Symptom**: `news_source` always shows "fallback" in metadata.json
+**Root Cause**: No research provider succeeded (all returned errors or empty results)
+**Diagnosis Steps**:
+1. Check `{series-id}/research.log` for detailed error messages
+2. Verify API keys are valid and have quota remaining
+3. Test individual providers:
+   ```bash
+   node scripts/test-research-mcp.js --provider=firecrawl
+   node scripts/test-research-mcp.js --provider=github
+   ```
 
-**Impact of Not Calling WebSearch**:
-- Content lacks latest trends and news
-- Reduced relevance and value for readers
-- `metadata.json` has inaccurate "news_source" information
-- Cannot differentiate between "websearch failed" vs "websearch not attempted"
+**Solution**:
+1. Update `config/research-providers.json` with valid API keys
+2. Enable additional providers as backup (e.g., enable Brave Search if Firecrawl fails)
+3. Check internet connectivity
+4. Review provider dashboards for API usage and errors
+
+**Prevention**:
+- Set up at least 2 providers (e.g., Firecrawl + GitHub) for redundancy
+- Monitor API quota and set up alerts
+- Test configuration weekly with: `node scripts/test-research-mcp.js`
+
+### Research Returns Outdated Results
+**Symptom**: Research results are from 2024 or earlier, not current
+**Root Cause**: Some sources cache results or are not updated frequently
+**Solution**:
+1. Prioritize Firecrawl (crawls live websites)
+2. Disable RSS feeds that are not frequently updated
+3. Adjust GitHub search to use `pushed:>2025-01-01` filter
+4. Verify query includes current year: `"{topic} 2026"`
+
+**Impact of Research Failures**:
+- Content may lack latest trends and news
+- Reduced relevance for time-sensitive topics
+- Cannot provide cutting-edge insights to readers
+- May require manual research supplementation
 
 ### B4A Publishing Failed
 **Symptom**: "Publish failed" for specific articles
@@ -636,44 +797,61 @@ Task N: Batch publish to B4A
 
 ## Version History
 
-### V2.2 (Current) - 2026-02-22
+### V2.3 (Current) - 2026-02-22
+**MAJOR UPDATE: Hybrid Research MCP Integration**
+
+**NEW FEATURES**:
+- ✅ **Replaced WebSearch with Hybrid Research MCP** - Multi-source research with automatic fallback
+- ✅ **Added Configuration section** - Complete setup guide for API keys
+- ✅ **Integrated 4 research providers**:
+  - Firecrawl (primary - for live website crawling)
+  - RSS Aggregator (for tech blogs and news)
+  - GitHub API (for repositories and issues)
+  - Brave/SerpAPI (optional web search)
+- ✅ **Automatic fallback chain** - If one provider fails, automatically tries next
+- ✅ **Enhanced validation checklist** - Verify research execution and API configuration
+- ✅ **Updated troubleshooting** - Provider-specific error diagnosis and solutions
+- ✅ **Configuration file template** - `config/research-providers.json` with examples
+
+**IMPORTANT NOTES**:
+- ⚠️ **BREAKING CHANGE**: WebSearch tool replaced with Hybrid Research MCP
+- ⚠️ Users MUST configure API keys before using research feature
+- ⚠️ Firecrawl API key recommended for best results
+- ⚠️ All research attempts are logged for debugging
+
+### V2.2 - WebSearch Fix
 **CRITICAL FIXES**:
-- ✅ Made quality review **MANDATORY** (was optional, caused skips)
-- ✅ Added standardized task list creation at workflow start
-- ✅ Added Task Management Strategy section with strict rules
-- ✅ Enhanced Best Practices with task management guidelines
-- ✅ **Fixed WebSearch never being called** - Added explicit invocation instructions
-- ✅ Added WebSearch verification checklist in Validation section
-- ✅ Added "WebSearch Never Called" troubleshooting guide
-- ⚠️ Fixed: Quality review was being skipped due to "(optional)" label
-- ⚠️ Fixed: WebSearch tool was not being invoked (only mentioned, not called)
+- Fixed WebSearch never being called (only described, not invoked)
+- Added explicit invocation instructions
+- Added verification checklists
+- Added troubleshooting guide for WebSearch issues
+
+**Previous Issues**:
+- WebSearch tool never actually invoked during Phase 1 research
+- `news_source` always showed "fallback" instead of "websearch"
+
+### V2.1 - Task Management Fix
+**CRITICAL FIXES**:
+- Made quality review MANDATORY (was optional)
+- Added Task Management Strategy section
+- Added standardized task list creation
+- Enhanced validation checklists
 
 **Previous Issues**:
 - Quality review step marked as "(optional)" led to skipping
-- No standardized task list creation
-- Task tracking was inconsistent
-- WebSearch tool never actually invoked during Phase 1 research
-
-### V2.1 - Task Management Fix
-- Made quality review mandatory
-- Added task management strategy
-- Enhanced validation checklists
+- No standardized task tracking mechanism
 
 ### V2.0 - Initial V2 Release
+**Initial V2 Features**:
 - Intelligent outline with news research
-- Graceful fallback for WebSearch failures
 - Descriptive file naming: `{title}_{timestamp}.md`
 - Enhanced error handling and retry logic
-- Task-based progress tracking (but not enforced)
+- Task-based progress tracking (not enforced)
 
-**Note**: V2.0 had design flaw - WebSearch was described but not explicitly invoked
-
-### V2.0 - Initial V2 Release
-- Intelligent outline with news research
-- Graceful fallback for WebSearch failures
-- Descriptive file naming: `{title}_{timestamp}.md`
-- Enhanced error handling and retry logic
-- Task-based progress tracking (but not enforced)
+**Known Issues** (fixed in later versions):
+- WebSearch described but not explicitly invoked (V2.2)
+- Quality review marked as optional (V2.1)
+- Weak task management (V2.1)
 
 ### V1.0
 - Basic outline generation
