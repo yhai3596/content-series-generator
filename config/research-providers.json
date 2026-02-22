@@ -17,6 +17,14 @@
     "search_depth": "advanced",
     "max_results": 10
   },
+  "brave_search": {
+    "enabled": true,
+    "api_key": "BSAK_Al3cPCa0m-_g1QFRSU9arC0IiM",
+    "timeout": 8000,
+    "search_lang": "zh-CN",
+    "safesearch": "moderate",
+    "result_filter": "news"
+  },
   "serpapi": {
     "enabled": true,
     "api_key": "b529ac2fdbb18ff24c729c8e088acc74055915d55ed2149231e0c016dc7625ef",
@@ -44,6 +52,7 @@
   "fallback_order": [
     "firecrawl",
     "tavily",
+    "brave_search",
     "rss_feeds",
     "github",
     "serpapi"
