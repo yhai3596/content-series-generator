@@ -13,7 +13,7 @@
   "tavily": {
     "enabled": true,
     "api_key": "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",
-    "timeout": 8000,
+    "timeout": 15000,
     "search_depth": "advanced",
     "max_results": 10
   },
