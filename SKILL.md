@@ -122,6 +122,32 @@ Claude will:
 
 ## Workflow
 
+### Task Management Strategy (CRITICAL)
+
+**MUST create comprehensive task list at start of series generation**. This ensures:
+- ✅ No steps are skipped (especially quality review)
+- ✅ Progress is visible to user in real-time
+- ✅ Can resume if interrupted
+- ✅ All articles go through mandatory quality evaluation
+
+**Task Creation Rules**:
+1. Use TaskCreate BEFORE starting each major phase
+2. Use TaskUpdate to mark status changes (pending → in_progress → completed)
+3. Create separate sub-tasks for each article generation + quality review pair
+4. NEVER skip quality review tasks - they are REQUIRED
+
+**Example Task Structure**:
+```
+Master Task: "Generate content series: {series_name}"
+├─ Sub-task 1: "Generate article 1/5: {title}"
+├─ Sub-task 2: "Quality review article 1/5" [REQUIRED]
+├─ Sub-task 3: "Generate article 2/5: {title}"
+├─ Sub-task 4: "Quality review article 2/5" [REQUIRED]
+...
+├─ Sub-task N: "Batch publish to B4A"
+└─ Sub-task N+1: "Generate final report"
+```
+
 ### Phase 1: Outline Generation
 
 1. **Parse user request** - Extract topic, count, word count, style
@@ -133,6 +159,30 @@ Claude will:
 4. **User review** - Present outline for approval/modification
 
 ### Phase 2: Content Generation
+
+**CRITICAL**: At the start of Phase 2, create comprehensive task list:
+
+```
+📋 系列生成任务清单 (系列ID: {series-id})
+
+Phase 1: 大纲生成 [已完成]
+- [x] 参数验证
+- [x] 大纲生成
+- [x] 用户确认
+
+Phase 2: 内容生成 [进行中]
+- [ ] 创建文章任务列表 (每篇一个独立任务)
+- [ ] 生成文章 1/{count}
+- [ ] 质量评审 1/{count} ⭐ REQUIRED
+- [ ] 生成文章 2/{count}
+- [ ] 质量评审 2/{count} ⭐ REQUIRED
+...
+
+Phase 3: 发布阶段 [待开始]
+- [ ] 批量发布到 B4A
+- [ ] 收集发布链接
+- [ ] 生成最终报告
+```
 
 1. **Create task list** - One task per article using TaskCreate
 2. **Load writing style guide** - Read `references/writing-style-guide.md` before generating
@@ -146,7 +196,7 @@ Claude will:
    ```
 4. **Update task status** - Use TaskUpdate to mark in_progress/completed
 5. **Save locally** - Format: `E:\AICoding\article\{series-id}\{title}_{timestamp}.md`
-6. **Quality review** - Auto-evaluate with content-quality-reviewer skill (optional)
+6. **Quality review** - MUST evaluate with content-quality-reviewer skill (REQUIRED)
 7. **Review decision** - If score < 85, show suggestions and ask: Accept/Revise/Regenerate
 8. **Error handling** - Retry failed articles, log errors
 
@@ -398,7 +448,40 @@ Enhanced utility functions.
 - User visibility into generation status
 - Resume capability
 
+## Validation Checklist
+
+**MUST verify before marking series complete**:
+
+### Phase 1: Outline Generation
+- [ ] All 5 parameters collected (series_name, target_audience, writing_style, article_count, words_per_article)
+- [ ] Outline generated and saved to outline.json
+- [ ] User approved outline (or skipped with explicit consent)
+
+### Phase 2: Content Generation
+- [ ] Master task created using TaskCreate
+- [ ] Sub-task created for each article (1 task per article)
+- [ ] All articles generated and saved with correct naming format
+- [ ] **Quality review completed for EVERY article** (score + suggestions)
+- [ ] All articles meet minimum score threshold (≥ 85) or user explicitly accepted lower scores
+- [ ] Task status updated for each step (TaskUpdate used consistently)
+
+### Phase 3: Publishing
+- [ ] All articles published to B4A (or user explicitly skipped)
+- [ ] All publish URLs collected and saved to metadata.json
+- [ ] Final REPORT.md generated
+- [ ] Task list marked complete
+
+**If any item is missing, SERIES IS NOT COMPLETE** - go back and complete it.
+
 ## Troubleshooting
+
+### Quality Review Skipped (CRITICAL ERROR)
+**Symptom**: Articles published without quality scores
+**Root Cause**: Step marked as "optional" in previous skill version
+**Solution**:
+1. Immediately stop and use content-quality-reviewer on all articles
+2. Re-publish if scores are below threshold
+3. Update skill.md to make quality review MANDATORY (already fixed in V2.1)
 
 ### WebSearch Unavailable
 **Symptom**: "WebSearch failed" in logs
@@ -422,24 +505,81 @@ Enhanced utility functions.
 **Solution**: Resume with "Continue series-{id}"
 **Recovery**: All completed articles preserved
 
+### Task List Not Created (CRITICAL ERROR)
+**Symptom**: No task tracking visible to user
+**Root Cause**: Skipped TaskCreate at workflow start
+**Solution**:
+1. Create task list immediately
+2. Retroactively document completed steps
+3. Follow Task Management Strategy in future (see Workflow section)
+
 ## Best Practices
+
+### Task Management (CRITICAL - DO NOT SKIP)
+
+**MUST follow task creation workflow**:
+
+1. **Create master task** at series start
+   - Subject: `Generate content series: {series_name}`
+   - Description: Include all parameters and timeline
+
+2. **Create sub-tasks for each article**
+   - Pattern: `Article {n}/{total}: {title}`
+   - Always pair with quality review task
+
+3. **Update status in real-time**
+   - Use TaskUpdate immediately after each step
+   - Never batch-update at the end
+
+4. **Mandatory quality review**
+   - Call content-quality-reviewer for EVERY article
+   - No exceptions, even if "optional" in workflow
+
+**Example Task Sequence**:
+```
+Task 1: Generate series outline
+Task 2: User approve outline
+Task 3: Generate article 1/5
+Task 4: Quality review article 1/5 ⭐ CRITICAL
+Task 5: Generate article 2/5
+Task 6: Quality review article 2/5 ⭐ CRITICAL
+...
+Task N: Batch publish to B4A
+```
+
+### Content Quality
 
 1. **Review outline before generation** - Saves time if adjustments needed
 2. **Monitor first article** - Verify style and quality before batch generation
 3. **Check file names** - Ensure titles are descriptive and unique
 4. **Backup before publishing** - Series data in `E:\AICoding\article\`
 5. **Test with small series first** - Try 3 articles before committing to 10+
+6. **ALWAYS run content-quality-reviewer** - Never skip quality evaluation
+7. **Address low scores** - If score < 85, revise before publishing
 
 ## Version History
 
-### V2 (Current)
+### V2.1 (Current) - 2026-02-22
+**CRITICAL FIXES**:
+- ✅ Made quality review **MANDATORY** (was optional, caused skips)
+- ✅ Added standardized task list creation at workflow start
+- ✅ Added Task Management Strategy section with strict rules
+- ✅ Enhanced Best Practices with task management guidelines
+- ⚠️ Fixed: Quality review was being skipped due to "(optional)" label
+
+**Previous Issues**:
+- Quality review step marked as "(optional)" led to skipping
+- No standardized task list creation
+- Task tracking was inconsistent
+
+### V2.0 - Initial V2 Release
 - Intelligent outline with news research
 - Graceful fallback for WebSearch failures
 - Descriptive file naming: `{title}_{timestamp}.md`
 - Enhanced error handling and retry logic
-- Task-based progress tracking
+- Task-based progress tracking (but not enforced)
 
-### V1
+### V1.0
 - Basic outline generation
 - Simple file naming: `01.md`, `02.md`
 - No news integration
